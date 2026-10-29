@@ -1,0 +1,72 @@
+from __future__ import annotations
+
+import pandas as pd
+import plotly.express as px
+import streamlit as st
+
+from app.services.analytics import compute_summary, compute_crowding, compute_service_summary
+
+st.set_page_config(page_title="Smart Core Dashboard", layout="wide")
+st.title("Smart Core Hospital Intelligence")
+st.caption("Egyptian hospital operations dashboard")
+
+uploaded = st.file_uploader("Upload hospital CSV or Excel", type=["csv", "xlsx", "xls"])
+
+if uploaded is not None:
+    if uploaded.name.lower().endswith(".csv"):
+        df = pd.read_csv(uploaded)
+    else:
+        df = pd.read_excel(uploaded)
+    st.subheader("Preview")
+    st.dataframe(df.head(10), use_container_width=True)
+    records = df.to_dict(orient="records")
+    summary = compute_summary(records)
+    crowding = compute_crowding(records)
+    services = compute_service_summary(records)
+
+    st.subheader("Overview")
+    c1, c2, c3 = st.columns(3)
+    c1.metric("Hospitals", summary["total_hospitals"])
+    c2.metric("Recent reports", summary["recent_reports"])
+    c3.metric("Average occupancy", f"{summary['average_occupancy']}%" if summary["average_occupancy"] is not None else "Insufficient data")
+
+    st.subheader("Crowding")
+    crowd_df = pd.DataFrame(crowding["flagged_hospitals"])
+    if not crowd_df.empty:
+        st.dataframe(crow_df)
+    else:
+        st.info("No hospitals are currently above the configured occupancy threshold.")
+
+    st.subheader("Service availability")
+    service_df = pd.DataFrame.from_dict(services, orient="index")
+    st.bar_chart(service_df)
+
+    st.subheader("Raw data")
+    st.download_button("Download filtered data", data=df.to_csv(index=False), file_name="smartcore_export.csv", mime="text/csv")
+else:
+    demo = pd.read_csv("data/samples/hospital_sample.csv")
+    records = demo.to_dict(orient="records")
+    summary = compute_summary(records)
+    crowding = compute_crowding(records)
+    services = compute_service_summary(records)
+
+    st.subheader("Demo dataset overview")
+    c1, c2, c3 = st.columns(3)
+    c1.metric("Hospitals", summary["total_hospitals"])
+    c2.metric("Recent reports", summary["recent_reports"])
+    c3.metric("Average occupancy", f"{summary['average_occupancy']}%" if summary["average_occupancy"] is not None else "Insufficient data")
+
+    st.dataframe(demo.head(20), use_container_width=True)
+
+    st.subheader("Crowding")
+    crowd_df = pd.DataFrame(crowding["flagged_hospitals"])
+    if not crowd_df.empty:
+        st.dataframe(crow_df)
+    else:
+        st.info("No hospitals are exceeding threshold in the current demo sample.")
+
+    st.subheader("Service availability")
+    service_df = pd.DataFrame.from_dict(services, orient="index")
+    st.bar_chart(service_df)
+
+    st.caption("Synthetic hospital sample data for demonstration only.")
